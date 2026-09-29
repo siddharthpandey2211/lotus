@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Glowing Lotus - Three.js</title>
+
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        overflow: hidden;
+        background: #000;
+        font-family: Arial, sans-serif;
+    }
+
+    canvas {
+        display: block;
+    }
+
+    .title {
+        position: fixed;
+        top: 45px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+
+        color: white;
+        text-align: center;
+
+        font-size: 34px;
+        line-height: 0.95;
+        font-weight: 800;
+        font-style: italic;
+
+        text-shadow:
+            0 0 10px rgba(255,255,255,.25),
+            0 0 25px rgba(255,150,210,.15);
+
+        pointer-events: none;
+    }
+
+    .title span {
+        display: block;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="title">
+    <span>Lotus</span>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.min.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+/* =========================================================
+   SCENE
+========================================================= */
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x020305);
+scene.fog = new THREE.FogExp2(0x020505, 0.035);
+
+/* =========================================================
+   CAMERA
+========================================================= */
+
+const camera = new THREE.PerspectiveCamera(
+    45,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+);
+
+camera.position.set(0, 2.7, 9.2);
+camera.lookAt(0, 1.0, 0);
+
+/* =========================================================
+   RENDERER
+========================================================= */
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: false
+});
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.25;
+
+document.body.appendChild(renderer.domElement);
+
+/* =========================================================
+   BLOOM
+========================================================= */
+
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.75,
+    0.7,
+    0.42
+);
+composer.addPass(bloomPass);
+
+/* =========================================================
+   LIGHTING
+========================================================= */
+
+const ambientLight = new THREE.AmbientLight(0x351d35, 1.4);
+scene.add(ambientLight);
+
+const pinkLight = new THREE.PointLight(0xffa6c9, 6, 8);
+pinkLight.position.set(0, 2.5, 0);
+scene.add(pinkLight);
+
+const whiteLight = new THREE.PointLight(0xffe4ef, 3, 6);
+whiteLight.position.set(0, 3.5, 1);
+scene.add(whiteLight);
+
+/* =========================================================
+   LOTUS GROUP
+========================================================= */
+
+const lotus = new THREE.Group();
+lotus.position.y = 0.15;
+scene.add(lotus);
+
+/* =========================================================
+   PETAL MATERIALS
+========================================================= */
+
+const outerMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xe99ab9,
+    emissive: 0x9b476d,
+    emissiveIntensity: 0.22,
+    roughness: 0.38,
+    metalness: 0.05,
+    transmission: 0.42,
+    transparent: true,
+    opacity: 0.68,
+    side: THREE.DoubleSide
+});
+
+const innerMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xf3b5cc,
+    emissive: 0xb86488,
+    emissiveIntensity: 0.25,
+    roughness: 0.3,
+    metalness: 0.02,
+    transmission: 0.5,
+    transparent: true,
+    opacity: 0.62,
+    side: THREE.DoubleSide
+});
+
+const centerMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf6c4d8,
+    emissive: 0xc9799b,
+    emissiveIntensity: 0.55,
+    roughness: 0.24,
+    transparent: true,
+    opacity: 0.78,
+    side: THREE.DoubleSide
+});
+
+const centerCoreMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd6a52f,
+    emissive: 0x604008,
+    emissiveIntensity: 0.18,
+    roughness: 0.3,
+    metalness: 0.28,
+    transparent: true,
+    opacity: 0.9,
+    side: THREE.DoubleSide
+});
+
+/* =========================================================
+   CREATE 3D PETAL
+========================================================= */
+
+function createPetal(length, width, height, material) {
+    const geometry = new THREE.BufferGeometry();
+    const segments = 14;
+    const vertices = [];
+    const indices = [];
+
+    for (let y = 0; y <= segments; y++) {
+        const t = y / segments;
+        const py = t * length;
+        const widthFactor = Math.sin(t * Math.PI);
+        const w = width * (0.15 + widthFactor * 0.85);
+        const curve = Math.pow(t, 1.7) * height;
+        const dome = Math.sin(t * Math.PI) * height * 0.35;
+
+        vertices.push(-w, py, curve + dome);
+        vertices.push(0, py, curve + dome + height * 0.12);
+        vertices.push(w, py, curve + dome);
+    }
+
+    for (let y = 0; y < segments; y++) {
+        const row = y * 3;
+        const next = (y + 1) * 3;
+
+        indices.push(row, next, row + 1);
+        indices.push(row + 1, next, next + 1);
+        indices.push(row + 1, next + 1, row + 2);
+        indices.push(row + 2, next + 1, next + 2);
+    }
+
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    const petalGroup = new THREE.Group();
+    petalGroup.add(new THREE.Mesh(geometry, material));
+
+    const edgeVertices = [];
+
+    for (let y = 0; y <= segments; y++) {
+        const row = y * 3 * 3;
+        edgeVertices.push(vertices[row], vertices[row + 1], vertices[row + 2]);
+    }
+
+    const tip = segments * 3 + 1;
+    edgeVertices.push(vertices[tip * 3], vertices[tip * 3 + 1], vertices[tip * 3 + 2]);
+
+    for (let y = segments; y >= 0; y--) {
+        const row = y * 3 + 2;
+        edgeVertices.push(vertices[row * 3], vertices[row * 3 + 1], vertices[row * 3 + 2]);
+    }
+
+    const edgeGeometry = new THREE.BufferGeometry();
+    edgeGeometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(edgeVertices, 3)
+    );
+
+    const edgeMaterial = new THREE.LineBasicMaterial({
+        color: 0xd8aa3d,
+        transparent: true,
+        opacity: 0.38,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+
+    petalGroup.add(new THREE.LineLoop(edgeGeometry, edgeMaterial));
+
+    return petalGroup;
+}
+
+/* =========================================================
+   OUTER PETALS
+========================================================= */
+
+const outerCount = 16;
+for (let i = 0; i < outerCount; i++) {
+    const angle = (i / outerCount) * Math.PI * 2;
+    const petal = createPetal(2.25, 0.84, 1.05, outerMaterial);
+    petal.rotation.z = angle;
+    petal.rotation.x = THREE.MathUtils.degToRad(-27);
+    petal.position.y = 0.92;
+    petal.position.x = Math.sin(angle) * 0.05;
+    petal.position.z = Math.cos(angle) * 0.05;
+    lotus.add(petal);
+}
+
+/* =========================================================
+   SECOND PETAL LAYER
+========================================================= */
+
+const middleCount = 13;
+for (let i = 0; i < middleCount; i++) {
+    const angle = (i / middleCount) * Math.PI * 2;
+    const petal = createPetal(1.85, 0.66, 1.12, innerMaterial);
+    petal.rotation.z = angle + 0.2;
+    petal.rotation.x = THREE.MathUtils.degToRad(-42);
+    petal.position.y = 1.12;
+    lotus.add(petal);
+}
+
+/* =========================================================
+   INNER PETALS
+========================================================= */
+
+const innerCount = 10;
+for (let i = 0; i < innerCount; i++) {
+    const angle = (i / innerCount) * Math.PI * 2;
+    const petal = createPetal(1.42, 0.5, 1.18, centerMaterial);
+    petal.rotation.z = angle;
+    petal.rotation.x = THREE.MathUtils.degToRad(-55);
+    petal.position.y = 1.34;
+    lotus.add(petal);
+}
+
+/* =========================================================
+   FOURTH PETAL LAYER
+========================================================= */
+
+const corePetalCount = 7;
+for (let i = 0; i < corePetalCount; i++) {
+    const angle = (i / corePetalCount) * Math.PI * 2 + 0.18;
+    const petal = createPetal(1.08, 0.42, 0.92, centerMaterial);
+    petal.rotation.z = angle;
+    petal.rotation.x = THREE.MathUtils.degToRad(-66);
+    petal.position.y = 1.43;
+    lotus.add(petal);
+}
+
+/* =========================================================
+   CENTER GLOW
+========================================================= */
+
+const centerGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+const center = new THREE.Mesh(centerGeometry, centerCoreMaterial);
+center.position.y = 1.78;
+lotus.add(center);
+
+/* =========================================================
+   GOLDEN CENTER PARTICLES
+========================================================= */
+
+const particleGeometry = new THREE.BufferGeometry();
+const particlePositions = [];
+for (let i = 0; i < 180; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = Math.random() * 0.34;
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    const y = 1.67 + Math.random() * 0.24;
+    particlePositions.push(x, y, z);
+}
+particleGeometry.setAttribute('position', new THREE.Float32BufferAttribute(particlePositions, 3));
+
+const particleMaterial = new THREE.PointsMaterial({
+    color: 0xe3b84c,
+    size: 0.022,
+    transparent: true,
+    opacity: 0.35,
+    blending: THREE.AdditiveBlending
+});
+
+const particles = new THREE.Points(particleGeometry, particleMaterial);
+lotus.add(particles);
+
+/* =========================================================
+   STEM
+========================================================= */
+
+const stemCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0.05, -1, 0),
+    new THREE.Vector3(-0.08, -2.2, 0),
+    new THREE.Vector3(0, -3.2, 0)
+]);
+
+const stemGeometry = new THREE.TubeGeometry(stemCurve, 32, 0.09, 12, false);
+const stemMaterial = new THREE.MeshStandardMaterial({
+    color: 0x168b63,
+    emissive: 0x075c40,
+    emissiveIntensity: 0.5,
+    roughness: 0.5
+});
+
+const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+stem.position.y = 1.0;
+lotus.add(stem);
+
+/* =========================================================
+   LEAVES
+========================================================= */
+
+function createLeaf(rotation, scale) {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, 0);
+    shape.bezierCurveTo(0.8, 0.5, 1.5, 1.2, 0, 2.2);
+    shape.bezierCurveTo(-1.5, 1.2, -0.8, 0.5, 0, 0);
+
+    const geometry = new THREE.ShapeGeometry(shape, 24);
+    const material = new THREE.MeshStandardMaterial({
+        color: 0x39b982,
+        emissive: 0x063d2a,
+        emissiveIntensity: 0.4,
+        roughness: 0.6,
+        side: THREE.DoubleSide
+    });
+
+    const leaf = new THREE.Mesh(geometry, material);
+    leaf.rotation.x = -Math.PI / 2;
+    leaf.rotation.z = rotation;
+    leaf.scale.set(scale, scale, scale);
+    leaf.position.y = -2.15;
+    return leaf;
+}
+
+lotus.add(createLeaf(-0.75, 0.95));
+lotus.add(createLeaf(0.75, 0.95));
+
+/* =========================================================
+   WATER
+========================================================= */
+
+const waterGeometry = new THREE.CircleGeometry(8, 96);
+const waterMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x03100e,
+    roughness: 0.18,
+    metalness: 0.65,
+    transparent: true,
+    opacity: 0.82
+});
+
+const water = new THREE.Mesh(waterGeometry, waterMaterial);
+water.rotation.x = -Math.PI / 2;
+water.position.y = -2.2;
+scene.add(water);
+
+/* =========================================================
+   SMALL GLOWING PARTICLES AROUND LOTUS
+========================================================= */
+
+const glowGeometry = new THREE.BufferGeometry();
+const glowPositions = [];
+for (let i = 0; i < 120; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 2.5 + Math.random() * 3.5;
+    glowPositions.push(
+        Math.cos(angle) * radius,
+        -0.2 + Math.random() * 4,
+        Math.sin(angle) * radius
+    );
+}
+glowGeometry.setAttribute('position', new THREE.Float32BufferAttribute(glowPositions, 3));
+
+const glowMaterial = new THREE.PointsMaterial({
+    color: 0xffa7d4,
+    size: 0.025,
+    transparent: true,
+    opacity: 0.65,
+    blending: THREE.AdditiveBlending
+});
+
+const glowParticles = new THREE.Points(glowGeometry, glowMaterial);
+scene.add(glowParticles);
+
+/* =========================================================
+   CONTROLS
+========================================================= */
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.enableZoom = false;
+controls.enableRotate = false;
+controls.autoRotate = false;
+controls.minPolarAngle = 0.7;
+controls.maxPolarAngle = 2.35;
+controls.minDistance = 5;
+controls.maxDistance = 12;
+controls.target.set(0, 0.5, 0);
+
+let hoverRotationY = 0;
+let hoverRotationX = 0;
+
+renderer.domElement.addEventListener('pointermove', (event) => {
+    hoverRotationY = (event.clientX / window.innerWidth - 0.5) * Math.PI;
+    hoverRotationX = (0.5 - event.clientY / window.innerHeight) * Math.PI;
+});
+
+renderer.domElement.addEventListener('pointerleave', () => {
+    hoverRotationY = 0;
+    hoverRotationX = 0;
+});
+
+/* =========================================================
+   ANIMATION
+========================================================= */
+
+const clock = new THREE.Clock();
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const time = clock.getElapsedTime();
+
+    lotus.rotation.y += (hoverRotationY - lotus.rotation.y) * 0.08;
+    lotus.rotation.x += (hoverRotationX - lotus.rotation.x) * 0.08;
+
+    const cameraPosition = camera.position.clone();
+    lotus.worldToLocal(cameraPosition);
+    const frontView = cameraPosition.z > 0.35;
+    center.visible = frontView;
+    particles.visible = frontView;
+
+    lotus.position.y = 0.15 + Math.sin(time * 0.8) * 0.025;
+    particles.rotation.y = time * 0.15;
+    glowParticles.rotation.y = time * 0.025;
+    pinkLight.position.x = Math.sin(time * 0.7) * 1.2;
+    pinkLight.position.z = Math.cos(time * 0.7) * 1.2;
+
+    controls.update();
+    composer.render();
+}
+
+animate();
+
+/* =========================================================
+   RESIZE
+========================================================= */
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+});
+
+</script>
+
+</body>
+</html>
